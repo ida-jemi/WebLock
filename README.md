@@ -7,7 +7,7 @@ WebLock is an end-to-end fraud detection system that models financial transactio
 
 ## The problem
 
-Most public fraud-detection projects train a tabular classifier (XGBoost/Random Forest) on a Kaggle CSV and stop there. That approach misses **coordinated fraud** — rings of accounts that deliberately behave normally at the individual-transaction level but are secretly linked through shared devices, IP addresses, or payment cards.
+Most public fraud-detection projects train a tabular classifier (XGBoost/Random Forest) on a Kaggle CSV and stop there. That approach misses **coordinated fraud** - rings of accounts that deliberately behave normally at the individual-transaction level but are secretly linked through shared devices, IP addresses, or payment cards.
 
 WebLock's core hypothesis: **relational structure catches what row-level features can't.**
 
@@ -41,6 +41,28 @@ flowchart TD
     G --> I[Risk score + top factors]
     H --> J[Transaction feed + network visualization]
 ```
+
+## Screenshots
+
+### Dashboard overview
+Live fraud metrics and a filterable transaction feed, scored in real time.
+
+<img width="1917" height="952" alt="Screenshot 2026-09-05 182139" src="https://github.com/user-attachments/assets/c51ef7d8-0612-4494-85a0-a8cda1f7e54e" />
+
+### Explainable risk scoring
+Every flagged transaction comes with the top contributing factors in plain language, not just a score.
+
+<img width="1912" height="957" alt="Screenshot 2026-09-05 184419" src="https://github.com/user-attachments/assets/d2a7b079-6e55-4128-a160-eff35002bc25" />
+
+### Fraud ring network visualization
+The shared-entity graph around a flagged account — accounts (blue), the selected account (red), and shared devices/IPs/cards (gray) they're tangled up with.
+
+<img width="1911" height="952" alt="Screenshot 2026-09-05 182736" src="https://github.com/user-attachments/assets/680e78f9-e4b3-484e-9aff-a75fa5a2c7a6" />
+
+### Real-time API - fraud case
+A high-risk transaction scored by the live FastAPI service, with SHAP-based explanation.
+
+<img width="1230" height="882" alt="Screenshot 2026-09-05 182006" src="https://github.com/user-attachments/assets/6140a56f-8ffa-4ba8-9a1c-3c2eabd8894e" />
 
 ## What's inside
 
