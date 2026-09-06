@@ -263,6 +263,7 @@ with right:
             nx.draw(G, pos, ax=ax, node_color=node_colors, node_size=300, with_labels=False, edge_color="gray")
             ax.set_title(f"Network around {acct_id[:14]}...")
             st.pyplot(fig)
+            plt.close(fig)
             st.caption("🔴 = selected account | 🔵 = other accounts | ⚪ = shared device/IP/card")
         else:
             st.info("No small-cluster connections to visualize — either isolated, or only linked via large generic clusters excluded above.")
