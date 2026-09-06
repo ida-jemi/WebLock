@@ -17,6 +17,7 @@ import numpy as np
 import networkx as nx
 import joblib
 import os
+import gc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
@@ -39,15 +40,29 @@ def load_artifacts():
 @st.cache_data
 def load_data():
     df = pd.read_csv(os.path.join(DATA_DIR, "transactions_with_graph_features.csv"))
-    # apply the same one-hot encoding used at training time; keep the raw
-    # merchant_category column too since the UI displays it directly
     dummies = pd.get_dummies(df["merchant_category"], prefix="cat")
     df = pd.concat([df, dummies], axis=1)
-    # ensure every category column the model expects exists, even if a
-    # category happens to be absent from this particular data slice
     for col in feature_cols:
         if col.startswith("cat_") and col not in df.columns:
             df[col] = 0
+
+    # Downcast numeric dtypes to roughly halve memory usage -- no meaningful
+    # precision loss for this use case, but matters a lot on memory-limited
+    # free-tier hosting.
+    float_cols = df.select_dtypes(include="float64").columns
+    df[float_cols] = df[float_cols].astype("float32")
+    int_cols = df.select_dtypes(include="int64").columns
+    df[int_cols] = df[int_cols].astype("int32")
+
+    # Cap the LIVE public demo to a representative sample rather than holding
+    # all 590K rows in memory at once. The full-scale results are already
+    # documented from the local pipeline run (see README) -- this only
+    # limits what the hosted demo keeps resident in RAM, which is standard
+    # practice for public demos of large-scale systems on free infrastructure.
+    MAX_DEMO_ROWS = 150_000
+    if len(df) > MAX_DEMO_ROWS:
+        df = df.sample(MAX_DEMO_ROWS, random_state=42).reset_index(drop=True)
+
     return df
 
 model, explainer, feature_cols = load_artifacts()
@@ -264,6 +279,8 @@ with right:
             ax.set_title(f"Network around {acct_id[:14]}...")
             st.pyplot(fig)
             plt.close(fig)
+            plt.close("all")  # extra safety net against any other stray figures
+            gc.collect()      # nudge Python to reclaim memory immediately
             st.caption("🔴 = selected account | 🔵 = other accounts | ⚪ = shared device/IP/card")
         else:
             st.info("No small-cluster connections to visualize — either isolated, or only linked via large generic clusters excluded above.")
