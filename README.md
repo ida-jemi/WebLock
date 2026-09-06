@@ -7,7 +7,7 @@ WebLock is an end-to-end fraud detection system that models financial transactio
 
 ## The problem
 
-Most public fraud-detection projects train a tabular classifier (XGBoost/Random Forest) on a Kaggle CSV and stop there. That approach misses **coordinated fraud** — rings of accounts that deliberately behave normally at the individual-transaction level but are secretly linked through shared devices, IP addresses, or payment cards.
+Most public fraud-detection projects train a tabular classifier (XGBoost/Random Forest) on a Kaggle CSV and stop there. That approach misses **coordinated fraud** - rings of accounts that deliberately behave normally at the individual-transaction level but are secretly linked through shared devices, IP addresses, or payment cards.
 
 WebLock's core hypothesis: **relational structure catches what row-level features can't.**
 
@@ -22,7 +22,7 @@ On the real-world [IEEE-CIS Fraud Detection](https://www.kaggle.com/c/ieee-fraud
 
 A **+25% relative improvement in PR-AUC** from adding graph features alone, with no other changes to the model. Graph features (`pagerank`, `clustering_coefficient`, `degree`) all rank in the top 10 most important features by SHAP value, alongside transaction amount and product category.
 
-**An honest, interesting wrinkle:** naively bucketing accounts by shared-entity cluster size shows *isolated* accounts with a higher raw fraud rate (6.9%) than heavily clustered ones (4.0%) — the opposite of the synthetic proof-of-concept's pattern. This is because the account-ID proxy used here (`card1`+`card2`+`addr1`, since IEEE-CIS has no real identity key) captures broad demographic/card similarity as much as true shared identity, so large clusters are dominated by unrelated legitimate repeat customers rather than fraud rings. Despite that, the *multivariate* graph features (PageRank, clustering coefficient) still contributed real signal the tabular baseline couldn't see — the lift is genuine, just noisier and less clean than a simple threshold on cluster size. See `RESUME_AND_INTERVIEW_PREP.md` for the full discussion.
+**An honest, interesting wrinkle:** naively bucketing accounts by shared-entity cluster size shows *isolated* accounts with a higher raw fraud rate (6.9%) than heavily clustered ones (4.0%), the opposite of the synthetic proof-of-concept's pattern. This is because the account-ID proxy used here (`card1`+`card2`+`addr1`, since IEEE-CIS has no real identity key) captures broad demographic/card similarity as much as true shared identity, so large clusters are dominated by unrelated legitimate repeat customers rather than fraud rings. Despite that, the *multivariate* graph features (PageRank, clustering coefficient) still contributed real signal the tabular baseline couldn't see, the lift is genuine, just noisier and less clean than a simple threshold on cluster size. See `RESUME_AND_INTERVIEW_PREP.md` for the full discussion.
 
 > This project also includes a synthetic dataset generator (`src/generate_data.py`) that was used during initial development, with deliberately clean fraud-ring patterns for validating the pipeline mechanics before moving to real data. Both paths are included; see "Using a real dataset" below.
 
@@ -41,6 +41,28 @@ flowchart TD
     G --> I[Risk score + top factors]
     H --> J[Transaction feed + network visualization]
 ```
+
+## Screenshots
+
+### Dashboard overview
+Live fraud metrics and a filterable transaction feed, scored in real time.
+
+<img width="1917" height="952" alt="Screenshot 2026-09-05 182139" src="https://github.com/user-attachments/assets/c51ef7d8-0612-4494-85a0-a8cda1f7e54e" />
+
+### Explainable risk scoring
+Every flagged transaction comes with the top contributing factors in plain language, not just a score.
+
+<img width="1912" height="957" alt="Screenshot 2026-09-05 184419" src="https://github.com/user-attachments/assets/d2a7b079-6e55-4128-a160-eff35002bc25" />
+
+### Fraud ring network visualization
+The shared-entity graph around a flagged account — accounts (blue), the selected account (red), and shared devices/IPs/cards (gray) they're tangled up with.
+
+<img width="1911" height="952" alt="Screenshot 2026-09-05 182736" src="https://github.com/user-attachments/assets/680e78f9-e4b3-484e-9aff-a75fa5a2c7a6" />
+
+### Real-time API - fraud case
+A high-risk transaction scored by the live FastAPI service, with SHAP-based explanation.
+
+<img width="1230" height="882" alt="Screenshot 2026-09-05 182006" src="https://github.com/user-attachments/assets/6140a56f-8ffa-4ba8-9a1c-3c2eabd8894e" />
 
 ## What's inside
 
@@ -65,17 +87,17 @@ weblock/
 
 ## How it works
 
-1. **Data generation** (`src/generate_data.py`) — creates realistic transactions: normal independent users, plus fraud rings that share a small pool of devices/IPs/cards and deliberately mimic normal transaction-level behavior (this is what makes the graph signal *necessary*, not just a bonus feature).
+1. **Data generation** (`src/generate_data.py`) - creates realistic transactions: normal independent users, plus fraud rings that share a small pool of devices/IPs/cards and deliberately mimic normal transaction-level behavior (this is what makes the graph signal *necessary*, not just a bonus feature).
 
-2. **Graph construction** (`src/graph_features.py`) — builds a graph where accounts are nodes and edges represent shared devices/IPs/cards. Computes per-account graph features: `degree`, `pagerank`, `clustering_coefficient`, `component_size`.
+2. **Graph construction** (`src/graph_features.py`) - builds a graph where accounts are nodes and edges represent shared devices/IPs/cards. Computes per-account graph features: `degree`, `pagerank`, `clustering_coefficient`, `component_size`.
 
-3. **Modeling** (`src/train_models.py`) — trains two LightGBM classifiers on an identical train/test split: one with tabular features only (baseline), one with tabular + graph features. This isolates and quantifies exactly how much the graph signal contributes.
+3. **Modeling** (`src/train_models.py`) - trains two LightGBM classifiers on an identical train/test split: one with tabular features only (baseline), one with tabular + graph features. This isolates and quantifies exactly how much the graph signal contributes.
 
-4. **Explainability** (`src/explainability.py`) — SHAP TreeExplainer generates per-transaction, human-readable explanations ("flagged mainly because: shared device with 6 other accounts").
+4. **Explainability** (`src/explainability.py`) - SHAP TreeExplainer generates per-transaction, human-readable explanations ("flagged mainly because: shared device with 6 other accounts").
 
-5. **Serving** (`api/main.py`) — FastAPI service exposing `POST /predict`, returning a fraud probability, risk tier (LOW/MEDIUM/HIGH), and the top 3 contributing factors for any transaction.
+5. **Serving** (`api/main.py`) - FastAPI service exposing `POST /predict`, returning a fraud probability, risk tier (LOW/MEDIUM/HIGH), and the top 3 contributing factors for any transaction.
 
-6. **Dashboard** (`dashboard/app.py`) — Streamlit app for a fraud analyst: filterable transaction feed, per-transaction explanation panel, and a live network graph visualization of the accounts/devices/IPs clustered around any flagged account.
+6. **Dashboard** (`dashboard/app.py`) - Streamlit app for a fraud analyst: filterable transaction feed, per-transaction explanation panel, and a live network graph visualization of the accounts/devices/IPs clustered around any flagged account.
 
 ## Running it locally
 
@@ -116,7 +138,7 @@ This repo ships with a synthetic dataset by default, but includes a ready-to-run
 2. Place both files in `data/kaggle/`.
 3. Run `python src/prepare_kaggle_data.py` instead of `generate_data.py` — everything downstream (`graph_features.py`, `train_models.py`, `explainability.py`) works unchanged, since the adapter reshapes the real data into the same schema.
 
-**Note on entity proxies:** IEEE-CIS doesn't provide an explicit account/device/IP identifier the way this project's synthetic data does — real fraud datasets rarely do. `prepare_kaggle_data.py` documents the specific proxy columns used (e.g. `card1`+`card2`+`addr1` as a pseudo account ID, `DeviceInfo` for device, purchaser email domain as a network proxy) and why, directly in its docstring. These are reasonable, explainable modeling choices, not ground truth — worth stating plainly if asked about them.
+**Note on entity proxies:** IEEE-CIS doesn't provide an explicit account/device/IP identifier the way this project's synthetic data does, real fraud datasets rarely do. `prepare_kaggle_data.py` documents the specific proxy columns used (e.g. `card1`+`card2`+`addr1` as a pseudo account ID, `DeviceInfo` for device, purchaser email domain as a network proxy) and why, directly in its docstring. These are reasonable, explainable modeling choices, not ground truth — worth stating plainly if asked about them.
 
 ## Tech stack
 
@@ -139,10 +161,6 @@ This repo ships with a synthetic dataset by default, but includes a ready-to-run
 
 ## Limitations & honest caveats
 
-- Built on synthetic data — real-world fraud signals are noisier and more distributed across features; expect the graph signal to be a strong contributor but not this dominant on production data.
-- Graph features here are computed in batch, not streaming — a production system would need incremental graph updates as new transactions arrive.
+- Built on synthetic data, real-world fraud signals are noisier and more distributed across features; expect the graph signal to be a strong contributor but not this dominant on production data.
+- Graph features here are computed in batch, not streaming, a production system would need incremental graph updates as new transactions arrive.
 - No formal hyperparameter tuning was done (kept default-ish LightGBM settings) since the focus of this project is the graph-vs-tabular comparison, not squeezing out the last few points of accuracy.
-
-## Author
-
-Built as an end-to-end portfolio project demonstrating graph-based feature engineering, explainable ML, and production-style deployment for fraud/risk use cases.
