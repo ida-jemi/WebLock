@@ -49,6 +49,11 @@ Live fraud metrics and a filterable transaction feed, scored in real time.
 
 <img width="1917" height="952" alt="Screenshot 2026-09-05 182139" src="https://github.com/user-attachments/assets/c51ef7d8-0612-4494-85a0-a8cda1f7e54e" />
 
+### Model comparison & global feature importance
+The dashboard surfaces the core research finding directly — baseline vs. graph-enhanced PR-AUC — plus model-wide feature importance, not just per-transaction explanations.
+
+<img width="1873" height="892" alt="Screenshot 2026-09-06 191601" src="https://github.com/user-attachments/assets/cbd8e61e-9ed2-4526-b1ec-940383a55a53" />
+
 ### Explainable risk scoring
 Every flagged transaction comes with the top contributing factors in plain language, not just a score.
 
@@ -97,7 +102,7 @@ weblock/
 
 5. **Serving** (`api/main.py`) - FastAPI service exposing `POST /predict`, returning a fraud probability, risk tier (LOW/MEDIUM/HIGH), and the top 3 contributing factors for any transaction.
 
-6. **Dashboard** (`dashboard/app.py`) - Streamlit app for a fraud analyst: filterable transaction feed, per-transaction explanation panel, and a live network graph visualization of the accounts/devices/IPs clustered around any flagged account.
+6. **Dashboard** (`dashboard/app.py`) - Streamlit app for a fraud analyst: filterable, searchable transaction feed with color-coded risk bars, per-transaction explanation panel, a live network graph visualization of the accounts/devices/IPs clustered around any flagged account, a baseline-vs-graph-enhanced model comparison chart, global SHAP feature importance, and one-click CSV export of flagged transactions.
 
 ## Running it locally
 
@@ -157,6 +162,7 @@ This repo ships with a synthetic dataset by default, but includes a ready-to-run
 - Entity-sharing graph capped at 50 accounts per shared value to avoid runaway generic identifiers (e.g. common card bins) polluting the graph
 - Real-time scoring via API, sub-second response time
 - Every prediction is explainable down to the top 3 contributing factors
+- Live in-dashboard model comparison chart and global feature importance view, alongside per-transaction explanations
 - A synthetic data generator is also included, used during initial pipeline development (near-perfect separation by design, useful for validating mechanics before moving to real data)
 
 ## Limitations & honest caveats
