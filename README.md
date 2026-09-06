@@ -1,4 +1,8 @@
-# WebLock
+# WebLock 
+(Deployed site: https://weblock-fraud-detection.streamlit.app/)
+
+---
+
 ### Graph-Based Real-Time Fraud Detection with Explainable Risk Scoring
 
 WebLock is an end-to-end fraud detection system that models financial transactions as a **graph** (accounts, devices, IPs, cards) rather than isolated rows, to catch coordinated fraud rings that traditional tabular models miss. It combines graph feature engineering, a gradient-boosted classifier, SHAP-based explainability, a real-time scoring API, and an analyst-facing dashboard.
