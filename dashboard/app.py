@@ -18,6 +18,7 @@ import networkx as nx
 import joblib
 import os
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
@@ -50,6 +51,25 @@ def load_data():
     return df
 
 model, explainer, feature_cols = load_artifacts()
+
+@st.cache_resource
+def load_baseline_comparison():
+    from sklearn.metrics import average_precision_score, roc_auc_score
+    baseline_model = joblib.load(os.path.join(MODEL_DIR, "baseline_model.pkl"))
+    tabular_features = joblib.load(os.path.join(MODEL_DIR, "tabular_features.pkl"))
+    X_test = pd.read_csv(os.path.join(DATA_DIR, "X_test.csv"))
+    y_test = pd.read_csv(os.path.join(DATA_DIR, "y_test.csv"))["is_fraud"]
+
+    baseline_proba = baseline_model.predict_proba(X_test[tabular_features])[:, 1]
+    graph_proba = model.predict_proba(X_test[feature_cols])[:, 1]
+
+    return {
+        "baseline_pr_auc": average_precision_score(y_test, baseline_proba),
+        "graph_pr_auc": average_precision_score(y_test, graph_proba),
+        "baseline_roc_auc": roc_auc_score(y_test, baseline_proba),
+        "graph_roc_auc": roc_auc_score(y_test, graph_proba),
+    }
+    
 df = load_data()
 
 # ---------------------------------------------------------------
@@ -72,7 +92,7 @@ scored_df = score_transactions(df)
 # ---------------------------------------------------------------
 # Header + summary metrics
 # ---------------------------------------------------------------
-st.title("🔒 WebLock — Fraud Analyst Dashboard")
+st.title("🔒 WebLock - Fraud Analyst Dashboard")
 st.caption("Graph-based real-time fraud detection with explainable risk scoring")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -81,6 +101,36 @@ col2.metric("Flagged HIGH risk", f"{(scored_df['risk_tier']=='HIGH').sum():,}")
 col3.metric("Flagged MEDIUM risk", f"{(scored_df['risk_tier']=='MEDIUM').sum():,}")
 col4.metric("Actual fraud rate", f"{scored_df['is_fraud'].mean():.1%}")
 
+
+with st.expander("📊 Why graph features matter — baseline vs. graph-enhanced model", expanded=True):
+    comp = load_baseline_comparison()
+    c1, c2 = st.columns(2)
+    c1.metric("Baseline PR-AUC (tabular only)", f"{comp['baseline_pr_auc']:.3f}")
+    c2.metric("Graph-enhanced PR-AUC", f"{comp['graph_pr_auc']:.3f}",
+              delta=f"{comp['graph_pr_auc'] - comp['baseline_pr_auc']:+.3f}")
+    fig = go.Figure(data=[
+        go.Bar(x=["Baseline", "Graph-enhanced"],
+               y=[comp["baseline_pr_auc"], comp["graph_pr_auc"]],
+               marker_color=["#d9534f", "#5cb85c"],
+               text=[f"{comp['baseline_pr_auc']:.3f}", f"{comp['graph_pr_auc']:.3f}"],
+               textposition="outside")
+    ])
+    fig.update_layout(yaxis_title="PR-AUC", showlegend=False, height=350, margin=dict(t=20))
+    st.plotly_chart(fig, use_container_width=True)
+
+@st.cache_data
+def compute_global_importance(_sample_df):
+    X_sample = _sample_df[feature_cols]
+    sample_shap = explainer.shap_values(X_sample)
+    sample_sv = sample_shap[1] if isinstance(sample_shap, list) else sample_shap
+    return pd.Series(np.abs(sample_sv).mean(axis=0), index=feature_cols).sort_values(ascending=False)
+
+with st.expander("🔍 Global feature importance (model-wide, sampled)"):
+    sample = scored_df.sample(min(2000, len(scored_df)), random_state=42)
+    importance = compute_global_importance(sample)
+    st.bar_chart(importance.head(10))
+    st.caption("Computed on a random 2,000-row sample for speed — mean absolute SHAP value across the sample.")
+    
 st.divider()
 
 # ---------------------------------------------------------------
@@ -93,9 +143,14 @@ with left:
     risk_filter = st.multiselect(
         "Filter by risk tier", options=["HIGH", "MEDIUM", "LOW"], default=["HIGH", "MEDIUM"]
     )
-    filtered = scored_df[scored_df["risk_tier"].isin(risk_filter)].sort_values(
-        "fraud_probability", ascending=False
-    )
+    search_query = st.text_input("Search by transaction ID or account ID (optional):", "")
+    filtered = scored_df[scored_df["risk_tier"].isin(risk_filter)]
+    if search_query:
+        filtered = filtered[
+            filtered["transaction_id"].str.contains(search_query, case=False, na=False) |
+            filtered["account_id"].str.contains(search_query, case=False, na=False)
+        ]
+    filtered = filtered.sort_values("fraud_probability", ascending=False)
 
     display_cols = [
         "transaction_id", "account_id", "amount", "merchant_category",
@@ -104,13 +159,33 @@ with left:
     st.dataframe(
         filtered[display_cols].head(200),
         use_container_width=True,
-        height=450
+        height=450,
+        column_config={
+            "fraud_probability": st.column_config.ProgressColumn(
+                "fraud_probability",
+                help="Model's predicted fraud probability",
+                min_value=0,
+                max_value=1,
+                format="%.3f",
+            ),
+            "amount": st.column_config.NumberColumn("amount", format="$%.2f"),
+        }
+    )
+    csv_data = filtered[display_cols].to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="⬇️ Download flagged transactions (CSV)",
+        data=csv_data,
+        file_name="weblock_flagged_transactions.csv",
+        mime="text/csv"
     )
 
-    selected_txn_id = st.selectbox(
-        "Select a transaction to inspect:",
-        options=filtered["transaction_id"].head(50).tolist()
-    )
+    top_50 = filtered.head(50)
+    label_map = {
+        row["transaction_id"]: f"{row['transaction_id']} — ${row['amount']:.2f} — {row['risk_tier']} ({row['fraud_probability']:.0%})"
+        for _, row in top_50.iterrows()
+    }
+    selected_label = st.selectbox("Select a transaction to inspect:", options=list(label_map.values()))
+    selected_txn_id = [k for k, v in label_map.items() if v == selected_label][0]
 
 with right:
     st.subheader("Why was this flagged?")
@@ -193,4 +268,4 @@ with right:
             st.info("No small-cluster connections to visualize — either isolated, or only linked via large generic clusters excluded above.")
 
 st.divider()
-st.caption("WebLock v1.0 — Graph-based fraud detection demo. Built with LightGBM, NetworkX, SHAP, FastAPI, Streamlit.")
+st.caption("WebLock v1.0 - Graph-based fraud detection demo. Built with LightGBM, NetworkX, SHAP, FastAPI, Streamlit.")

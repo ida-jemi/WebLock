@@ -94,6 +94,9 @@ def risk_tier(proba: float) -> str:
 
 
 @app.get("/")
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
 def root():
     return {"service": "WebLock Fraud Scoring API", "status": "running"}
 
