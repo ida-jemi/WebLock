@@ -26,9 +26,13 @@ On the real-world [IEEE-CIS Fraud Detection](https://www.kaggle.com/c/ieee-fraud
 
 A **+25% relative improvement in PR-AUC** from adding graph features alone, with no other changes to the model. Graph features (`pagerank`, `clustering_coefficient`, `degree`) all rank in the top 10 most important features by SHAP value, alongside transaction amount and product category.
 
-**An honest, interesting wrinkle:** naively bucketing accounts by shared-entity cluster size shows *isolated* accounts with a higher raw fraud rate (6.9%) than heavily clustered ones (4.0%), the opposite of the synthetic proof-of-concept's pattern. This is because the account-ID proxy used here (`card1`+`card2`+`addr1`, since IEEE-CIS has no real identity key) captures broad demographic/card similarity as much as true shared identity, so large clusters are dominated by unrelated legitimate repeat customers rather than fraud rings. Despite that, the *multivariate* graph features (PageRank, clustering coefficient) still contributed real signal the tabular baseline couldn't see, the lift is genuine, just noisier and less clean than a simple threshold on cluster size. See `RESUME_AND_INTERVIEW_PREP.md` for the full discussion.
+**An honest, interesting wrinkle:** naively bucketing accounts by shared-entity cluster size shows *isolated* accounts with a higher raw fraud rate (6.9%) than heavily clustered ones (4.0%), the opposite of the synthetic proof-of-concept's pattern. This is because the account-ID proxy used here (`card1`+`card2`+`addr1`, since IEEE-CIS has no real identity key) captures broad demographic/card similarity as much as true shared identity, so large clusters are dominated by unrelated legitimate repeat customers rather than fraud rings. Despite that, the *multivariate* graph features (PageRank, clustering coefficient) still contributed real signal the tabular baseline couldn't see, the lift is genuine, just noisier and less clean than a simple threshold on cluster size.
 
 > This project also includes a synthetic dataset generator (`src/generate_data.py`) that was used during initial development, with deliberately clean fraud-ring patterns for validating the pipeline mechanics before moving to real data. Both paths are included; see "Using a real dataset" below.
+
+## Policy analysis
+
+A two-page analysis of how WebLock measures up against the EU AI Act's transparency, record-keeping and human-oversight requirements, and what the fraud-detection exclusion means for people wrongly flagged: [EU AI Act policy brief](docs/EU_AI_ACT_POLICY_BRIEF.md) ([PDF](docs/EU_AI_ACT_POLICY_BRIEF.pdf)).
 
 ## Architecture
 
@@ -81,12 +85,16 @@ weblock/
 │   ├── generate_data.py      # synthetic transaction data with embedded fraud rings
 │   ├── graph_features.py     # builds the shared-entity graph, computes graph features
 │   ├── train_models.py       # trains + compares baseline vs graph-enhanced LightGBM
-│   └── explainability.py     # SHAP-based per-transaction explanations
+│   ├── explainability.py     # SHAP-based per-transaction explanations
+│   └── prepare_kaggle_data.py # adapter that reshapes IEEE-CIS into the project schema
 ├── api/
 │   └── main.py                # FastAPI real-time scoring service
 ├── dashboard/
 │   └── app.py                  # Streamlit analyst dashboard
 ├── data/                        # generated datasets (created by scripts)
+├── docs/
+│   ├── EU_AI_ACT_POLICY_BRIEF.md    # policy analysis
+│   └── EU_AI_ACT_POLICY_BRIEF.pdf   # same analysis, PDF
 ├── models/                      # trained model artifacts (created by scripts)
 ├── requirements.txt
 ├── Dockerfile                   # API container
@@ -130,6 +138,7 @@ uvicorn api.main:app --reload --port 8000
 streamlit run dashboard/app.py
 # Visit http://localhost:8501
 ```
+> These commands use the synthetic data. To reproduce the headline IEEE-CIS results, follow "Using a real dataset" below.
 
 ## Running with Docker
 
@@ -151,11 +160,11 @@ This repo ships with a synthetic dataset by default, but includes a ready-to-run
 
 ## Tech stack
 
-**Data & modeling:** Python, pandas, NetworkX, LightGBM, scikit-learn
-**Explainability:** SHAP
-**Serving:** FastAPI, Pydantic, Uvicorn
-**Dashboard:** Streamlit, Matplotlib
-**Deployment:** Docker, docker-compose
+- **Data & modeling:** Python, pandas, NetworkX, LightGBM, scikit-learn
+- **Explainability:** SHAP
+- **Serving:** FastAPI, Pydantic, Uvicorn
+- **Dashboard:** Streamlit, Matplotlib
+- **Deployment:** Docker, docker-compose
 
 ## Results summary
 
@@ -171,6 +180,7 @@ This repo ships with a synthetic dataset by default, but includes a ready-to-run
 
 ## Limitations & honest caveats
 
-- Built on synthetic data, real-world fraud signals are noisier and more distributed across features; expect the graph signal to be a strong contributor but not this dominant on production data.
+- Headline results are on real IEEE-CIS data, where the graph signal is noisier than in the synthetic data used during development (near-perfect separation by design). Entity IDs are proxies built from `card1`, `card2` and `addr1`, not true identities.
 - Graph features here are computed in batch, not streaming, a production system would need incremental graph updates as new transactions arrive.
 - No formal hyperparameter tuning was done (kept default-ish LightGBM settings) since the focus of this project is the graph-vs-tabular comparison, not squeezing out the last few points of accuracy.
+- Not production-ready for a regulated deployment: as documented here, there is no per-prediction audit log, no record of analyst confirm/override decisions, and no drift monitoring. The policy brief maps these gaps to the EU AI Act.
