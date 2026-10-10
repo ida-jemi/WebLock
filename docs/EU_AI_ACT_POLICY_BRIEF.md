@@ -32,8 +32,6 @@ Because WebLock is probably not high-risk, Articles 12 to 15 and 86 do not legal
 3. **The accuracy numbers are good relative to chance but modest in absolute terms.** A random classifier's PR-AUC is roughly the fraud rate, 0.035, so 0.219 is about six times better than chance, and the graph features lifted PR-AUC by 25% over the baseline. Even so, an analyst reviewing HIGH-tier alerts should expect many false positives, so human review is necessary, not optional.
 4. **Logging is the cheapest gap to close.** Without a record of each prediction, neither Art. 12 traceability nor any later challenge to a decision is possible.
 
-<!-- Optional: after running a precision/recall check at the HIGH threshold, add one sentence to finding 3: "At my HIGH threshold, precision is __% and recall is __%." Delete this comment if you don't. -->
-
 ## 4. What I would change
 
 1. Add an append-only audit log for every scoring call: timestamp, model version, hashed transaction ID, score, tier, top factors.
